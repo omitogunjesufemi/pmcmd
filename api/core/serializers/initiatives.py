@@ -2,6 +2,8 @@ from rest_framework import serializers
 from api.auth.serializers import UserSerializer
 from api.core.models.initiatives import (InitiativeType, Category, InitiativeDocument,
                                          Initiative, StageRequirementTemplate)
+from utils.constants import DocumentStatus, STAGES
+
 
 
 class InitiativeTypeSerializer(serializers.ModelSerializer):
@@ -61,7 +63,7 @@ class StageRequirementTemplateOutputSerializer(serializers.ModelSerializer):
 
 class StageRequirementTemplateInputSerializer(serializers.Serializer):
     initiative_type_id = serializers.UUIDField()
-    stage = serializers.CharField(max_length=30)
+    stage = serializers.ChoiceField(choices=STAGES.choices)
     is_required = serializers.BooleanField(default=True)
     document_name = serializers.CharField(max_length=225)
 
@@ -72,9 +74,21 @@ class InitiativeDocumentOutputSerializer(serializers.ModelSerializer):
     class Meta:
         model = InitiativeDocument
         fields = [
-            'id', 'initiative', 'stage', 'document_name', 'is_required',
+            'id', 'initiative', 'stage', 'status', 'document_name', 'is_required',
             'submitted_by', 'submitted_at', 'waiver_reason'
         ]
         read_only_fields = [
             'id', 'submitted_by', 'submitted_at', 'created_at', 'updated_at'
         ]
+
+
+class InitiativeDocumentInputSerializer(serializers.Serializer):
+    initiative_id = serializers.UUIDField()
+    stage = serializers.ChoiceField(choices=STAGES.choices)
+    document_name = serializers.CharField(max_length=100)
+    is_required = serializers.BooleanField(default=True)
+    waiver_reason = serializers.CharField(
+        allow_blank=True,
+        allow_null=True,
+        required=False
+    )
