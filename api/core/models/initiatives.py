@@ -10,6 +10,9 @@ class InitiativeType(BaseModel):
         unique=True
     )
 
+    def __str__(self):
+        return f'{self.name}'
+
     class Meta:
         ordering = ['-created_at']
 
@@ -17,6 +20,9 @@ class InitiativeType(BaseModel):
 class Category(BaseModel):
     """Initiative Category"""
     name = models.CharField(max_length=225, unique=True)
+
+    def __str__(self):
+        return f'{self.name}'
 
     class Meta:
         ordering = ['-created_at']
