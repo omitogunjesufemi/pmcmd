@@ -97,7 +97,7 @@ class InitiativeDocument(BaseModel):
     initiative = models.ForeignKey(
         Initiative,
         on_delete = models.CASCADE,
-        related_name = 'submitted_documents'
+        related_name = 'documents'
     )
     stage = models.CharField(
         max_length=30,
