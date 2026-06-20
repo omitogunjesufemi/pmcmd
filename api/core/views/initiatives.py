@@ -4,12 +4,16 @@ from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from api.core.services.initiatives import InitiativeDocumentService, InitiativeTypeService
+
+from api.core.serializers import CategorySerializer
+from api.core.services.initiatives import InitiativeDocumentService, InitiativeTypeService, CategoryService
 from api.core.serializers.initiatives import InitiativeDocumentOutputSerializer, InitiativeTypeSerializer
+from api.core.views.base import BaseListCreateAPIView, BaseRetrieveUpdateDeleteAPIView
 
 
 class GetAllInitiativeDocuments(APIView):
     permission_classes = [AllowAny]
+
     def get(self, request):
         documents = InitiativeDocumentService().get_documents()
         data = InitiativeDocumentOutputSerializer(documents, many=True).data
@@ -24,61 +28,62 @@ class GetAllInitiativeDocuments(APIView):
 
 
 # -------------------------------------
-# Initiative Type View Actions
-#--------------------------------------
-class CreateInitiativeType(APIView):
-    permission_classes = [AllowAny]
-
-    @extend_schema(
-        tags=['Initiative Types'],
-        request=InitiativeTypeSerializer,
-    )
-    def post(self, request: Request):
-        serializer = InitiativeTypeSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        result = (InitiativeTypeSerializer(
-            InitiativeTypeService()
-            .create_type(**serializer.validated_data))
-                  .data)
-        return Response(
-            {
-                'success':True,
-                'message': 'Initiative Type created successfully',
-                'data': result,
-            },
-            status=status.HTTP_201_CREATED
-        )
+# Initiative CRUD Type View Actions
+# -------------------------------------
+@extend_schema(
+    tags=["Initiative Types"]
+)
+class InitiativeTypeListCreateView(BaseListCreateAPIView):
+    service_class = InitiativeTypeService
+    serializer_class = InitiativeTypeSerializer
+    resource_name = "Initiative Type"
+    permission_classes_by_method = {
+        'GET': [AllowAny],
+        'POST': [AllowAny]
+    }
 
 
-class ListAllInitiativeTypes(APIView):
-    @extend_schema(
-        tags=['Initiative Types'],
-    )
-    def get(self, request: Request):
-        initiative_types = InitiativeTypeService().get_all_types()
-        result = InitiativeTypeSerializer(initiative_types, many=True).data
-        return Response(
-            {
-                'success': True,
-                'message': 'Initiative Types retrieved successfully',
-                'data': result,
-            },
-            status=status.HTTP_200_OK
-        )
+@extend_schema(
+    tags=["Initiative Types"]
+)
+class InitiativeTypeDetailView(BaseRetrieveUpdateDeleteAPIView):
+    service_class = InitiativeTypeService
+    serializer_class = InitiativeTypeSerializer
+    resource_name = "Initiative Type"
+    lookup_url_kwarg = "type_id"
+
+    permission_classes_by_method = {
+        'GET': [AllowAny],
+        'PATCH': [AllowAny]
+    }
 
 
-class GetInitiativeType(APIView):
-    @extend_schema(
-        tags=['Initiative Types'],
-    )
-    def get(self, request: Request, type_id):
-        initiative_type = InitiativeTypeService().get_type_by_id(type_id)
-        result = InitiativeTypeSerializer(initiative_type).data
-        return Response(
-            {
-                'success': True,
-                'message': f'Initiative Type ({type_id}) retrieved successfully',
-                'data': result,
-            },
-            status=status.HTTP_200_OK
-        )
+# ------------------------------------
+# Category CRUD View Actions              |
+# ------------------------------------
+@extend_schema(
+    tags=["Category"]
+)
+class CategoryListCreateView(BaseListCreateAPIView):
+    service_class = CategoryService
+    serializer_class = CategorySerializer
+    resource_name = "Category"
+    permission_classes_by_method = {
+        'GET': [AllowAny],
+        'POST': [AllowAny]
+    }
+
+
+@extend_schema(
+    tags=["Category"]
+)
+class CategoryDetailView(BaseRetrieveUpdateDeleteAPIView):
+    service_class = CategoryService
+    serializer_class = CategorySerializer
+    resource_name = "Category"
+    lookup_url_kwarg = "category_id"
+
+    permission_classes_by_method = {
+        'GET': [AllowAny],
+        'PATCH': [AllowAny]
+    }

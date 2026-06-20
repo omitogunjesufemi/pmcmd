@@ -3,7 +3,7 @@ from django.utils import timezone
 from api.auth.models import User
 from api.core.models import InitiativeDocument, InitiativeType, StageRequirementTemplate, Initiative
 from api.core.repositories.initiative import InitiativeTypeRepository, StageRequirementTemplateRepository, \
-    InitiativeDocumentRepository, InitiativeRepository
+    InitiativeDocumentRepository, InitiativeRepository, CategoryRepository
 from api.core.services.governance import AuditLogService, ApprovalService
 from utils.constants import DocumentStatus, Actions
 from rest_framework.exceptions import NotFound
@@ -14,27 +14,61 @@ class InitiativeTypeService:
     def __init__(self):
         self.repo = InitiativeTypeRepository()
 
-    def create_type(self, name):
+    def create(self, name):
         data = {
             'name': name
         }
         return self.repo.create(**data)
 
-    def get_type_by_id(self, type_id):
+    def get_by_id(self, type_id):
         initiative_type =  self.repo.get_by_id(id=type_id)
         if not initiative_type:
             raise NotFound(f"initiative Type with ID {type_id} was not found.")
         return initiative_type
 
-    def get_all_types(self):
+    def get_all(self):
         return self.repo.get_all()
+
+    def update(self, type_id, name):
+        initiative_type = self.get_by_id(type_id)
+        data = {
+            'name': name
+        }
+        return self.repo.update(initiative_type, **data)
+
+
+class CategoryService:
+    def __init__(self):
+        self.repo = CategoryRepository()
+
+    def create(self, name):
+        data = {
+            'name': name
+        }
+        return self.repo.create(**data)
+
+    def get_by_id(self, category_id):
+        category = self.repo.get_by_id(category_id)
+        if not category:
+            raise NotFound(f"Category with ID {category_id} was not found.")
+        return category
+
+    def get_all(self):
+        return self.repo.get_all()
+
+    def update(self, category_id, name):
+        category = self.get_by_id(category_id)
+        data = {
+            'name': name
+        }
+        return self.repo.update(category, **data)
 
 
 class InitiativeService:
     def __init__(self):
         self.repo = InitiativeRepository()
 
-    def get_by_initiative_id(self, initiative_id):
+    def get_by_id(self, initiative_id):
         initiative = self.repo.get_by_id(id=initiative_id)
         if not initiative:
             raise NotFound(f"Initiative with ID {initiative_id} was not found.")

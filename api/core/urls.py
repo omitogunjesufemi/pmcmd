@@ -1,11 +1,12 @@
 from rest_framework.urls import path
 
-from api.core.views.initiatives import GetAllInitiativeDocuments, CreateInitiativeType, ListAllInitiativeTypes, \
-    GetInitiativeType
+from api.core.views.initiatives import GetAllInitiativeDocuments, InitiativeTypeListCreateView, \
+    InitiativeTypeDetailView, CategoryListCreateView, CategoryDetailView
 
 urlpatterns = [
     path('documents/all', GetAllInitiativeDocuments.as_view(), name='get_all_initiative_documents'),
-    path('initiative_types/create', CreateInitiativeType.as_view(), name='create_initiative_type'),
-    path('initiative_types/all', ListAllInitiativeTypes.as_view(), name='get_all_initiative_types'),
-    path('initiative_types/<uuid:type_id>', GetInitiativeType.as_view(), name='get_initiative_type'),
+    path('initiative_types', InitiativeTypeListCreateView.as_view(), name='initiative_type_list_create'),
+    path('initiativetypes/<uuid:type_id>', InitiativeTypeDetailView.as_view(), name='initiative_type_detail_view'),
+    path('categories', CategoryListCreateView.as_view(), name='category_list_create_view'),
+    path('categories/<uuid:category_id>', CategoryDetailView.as_view(), name='category_detail_view'),
 ]

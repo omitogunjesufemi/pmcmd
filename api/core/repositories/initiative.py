@@ -1,7 +1,5 @@
 from typing import List
-
 from django.db.models import QuerySet
-
 from api.auth.models import User
 from api.core.models import Initiative, InitiativeType, Category, StageRequirementTemplate
 from api.core.repositories.base import BaseRepository
@@ -108,6 +106,7 @@ class StageRequirementTemplateRepository(BaseRepository):
 
     def delete(self, template):
         self.model.objects.filter(id=template.id).delete()
+
 
 class InitiativeTypeRepository(BaseRepository):
     model = InitiativeType
