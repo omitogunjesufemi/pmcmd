@@ -21,7 +21,7 @@ class InitiativeRepository(BaseRepository):
             initiatives = initiatives.filter(owner=owner)
 
         if stage:
-            initiatives = initiatives.filter(stage=stage)
+            initiatives = initiatives.filter(current_stage=stage)
 
         if status:
             initiatives = initiatives.filter(status=status)
@@ -72,7 +72,7 @@ class InitiativeDocumentRepository(BaseRepository):
     def get_blocking_documents(self, initiative, stage) -> QuerySet[InitiativeDocument]:
         documents = (self.model.objects
                      .select_related('initiative', 'submitted_by')
-                     .filter(initiative=initiative, stage=stage)
+                     .filter(initiative=initiative, stage=stage, is_required=True)
                      .exclude(status__in=[DocumentStatus.WAIVED, DocumentStatus.APPROVED]))
         return documents
 
@@ -100,11 +100,10 @@ class StageRequirementTemplateRepository(BaseRepository):
                  .filter(initiative_type=initiative_type))
         return requirement_templates
 
-    def get_by_initiative_type_and_stage(self, initiative_type, stage) -> StageRequirementTemplate:
+    def get_by_initiative_type_and_stage(self, initiative_type, stage) -> QuerySet[StageRequirementTemplate]:
         requirement_template = (self.model.objects
                                 .select_related('initiative_type')
-                                .filter(initiative_type=initiative_type, stage=stage)
-                                .first())
+                                .filter(initiative_type=initiative_type, stage=stage))
         return requirement_template
 
     def delete(self, template):

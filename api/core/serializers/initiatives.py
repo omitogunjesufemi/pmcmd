@@ -5,7 +5,6 @@ from api.core.models.initiatives import (InitiativeType, Category, InitiativeDoc
 from utils.constants import DocumentStatus, STAGES
 
 
-
 class InitiativeTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = InitiativeType

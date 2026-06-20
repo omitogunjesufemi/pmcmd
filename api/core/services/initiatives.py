@@ -4,7 +4,7 @@ from api.auth.models import User
 from api.core.models import InitiativeDocument, InitiativeType, StageRequirementTemplate, Initiative
 from api.core.repositories.initiative import InitiativeTypeRepository, StageRequirementTemplateRepository, \
     InitiativeDocumentRepository, InitiativeRepository
-from api.core.services.governance import AuditLogService
+from api.core.services.governance import AuditLogService, ApprovalService
 from utils.constants import DocumentStatus, Actions
 from rest_framework.exceptions import NotFound
 from utils.exceptions import InvalidStateTransitionException
@@ -21,7 +21,10 @@ class InitiativeTypeService:
         return self.repo.create(**data)
 
     def get_type_by_id(self, type_id):
-        return self.repo.get_by_id(id=type_id)
+        initiative_type =  self.repo.get_by_id(id=type_id)
+        if not initiative_type:
+            raise NotFound(f"initiative Type with ID {type_id} was not found.")
+        return initiative_type
 
     def get_all_types(self):
         return self.repo.get_all()
@@ -117,17 +120,9 @@ class InitiativeDocumentService:
         AuditLogService().log(initiative, Actions.SUBMITTED, user, submission)
         return submission
 
-    def waive_document(self, initiative_id, document_name, waiver_reason, user):
+    def waive_document(self, initiative_id, document_id, waiver_reason, user):
         initiative: Initiative = InitiativeService().get_by_initiative_id(initiative_id)
-        document_to_waive = self.repo.get_submission_template(initiative, document_name)
-        if not document_to_waive:
-            raise NotFound(f"The document for this initiative {initiative_id}  was not found.")
-
-        data_to_update = {
-            'status': DocumentStatus.WAIVED,
-            'waiver_reason': waiver_reason
-        }
-        waiver = self.repo.update(document_to_waive, **data_to_update)
+        waiver = ApprovalService().waive_document(document_id, user, waiver_reason)
         AuditLogService().log(initiative, Actions.WAIVED, user, waiver)
         return waiver
 
