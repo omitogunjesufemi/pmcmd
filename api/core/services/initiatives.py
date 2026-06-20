@@ -6,6 +6,8 @@ from api.core.repositories.initiative import InitiativeTypeRepository, StageRequ
     InitiativeDocumentRepository, InitiativeRepository
 from api.core.services.governance import AuditLogService
 from utils.constants import DocumentStatus, Actions
+from rest_framework.exceptions import NotFound
+from utils.exceptions import InvalidStateTransitionException
 
 
 class InitiativeTypeService:
@@ -31,6 +33,8 @@ class InitiativeService:
 
     def get_by_initiative_id(self, initiative_id):
         initiative = self.repo.get_by_id(id=initiative_id)
+        if not initiative:
+            raise NotFound(f"Initiative with ID {initiative_id} was not found.")
         return initiative
 
 
@@ -41,6 +45,8 @@ class StageRequirementTemplateService:
     def create_template(self, initiative_type_id, stage: str, document_name: str,
                         is_required: bool = True):
         initiative_type = InitiativeTypeService().get_type_by_id(initiative_type_id)
+        if not initiative_type:
+            raise NotFound(f"Initiative Type with ID: {initiative_type_id} was not found.")
 
         template_data = {
             'initiative_type': initiative_type,
@@ -51,7 +57,12 @@ class StageRequirementTemplateService:
         return self.repo.create(**template_data)
 
     def get_template(self, initiative_type_id = None, stage: str = None):
+        if initiative_type_id is None:
+            return self.repo.get_all()
+
         initiative_type = InitiativeTypeService().get_type_by_id(initiative_type_id)
+        if not initiative_type:
+            raise NotFound(f"Initiative Type with ID: {initiative_type_id} was not found.")
 
         if initiative_type and stage:
             return self.repo.get_by_initiative_type_and_stage(initiative_type=initiative_type, stage=stage)
@@ -59,16 +70,18 @@ class StageRequirementTemplateService:
         if initiative_type:
             return self.repo.get_by_initiative_type(initiative_type=initiative_type)
 
-        return self.repo.get_all()
-
     def update_template(self, template_id, data_update: dict):
         requirement_template = self.repo.get_by_id(id=template_id)
         if not requirement_template:
-            return None
+            raise NotFound(f"Stage Requirement Template with ID {template_id} was not found.")
+
         return self.repo.update(requirement_template, **data_update)
 
     def delete_template(self, template_id):
         requirement_template = self.repo.get_by_id(id=template_id)
+        if not requirement_template:
+            raise NotFound(f"Stage Requirement Template with ID {template_id} was not found.")
+
         self.repo.delete(requirement_template)
 
 
@@ -78,11 +91,23 @@ class InitiativeDocumentService:
 
     def generate_checklist_for_initiative(self, initiative_id):
         initiative: Initiative = InitiativeService().get_by_initiative_id(initiative_id)
+        existing_documents = self.repo.get_by_initiative(initiative)
+
+        if existing_documents.exists():
+            raise InvalidStateTransitionException("Checklist has already been generated for this initiative.")
+
         return self.repo.generate_checklist(initiative)
 
     def submit_document(self, initiative_id, document_name, user):
         initiative: Initiative = InitiativeService().get_by_initiative_id(initiative_id)
         document_to_submit = self.repo.get_submission_template(initiative, document_name)
+        if not document_to_submit:
+            raise NotFound(f"The document for this initiative {initiative_id}  was not found.")
+
+        if document_to_submit.status in [DocumentStatus.SUBMITTED,
+                                         DocumentStatus.WAIVED, DocumentStatus.APPROVED]:
+            raise InvalidStateTransitionException("Only pending or rejected documents can be submitted.")
+
         data_to_update = {
             'submitted_by': user,
             'submitted_at': timezone.now(),
@@ -95,6 +120,9 @@ class InitiativeDocumentService:
     def waive_document(self, initiative_id, document_name, waiver_reason, user):
         initiative: Initiative = InitiativeService().get_by_initiative_id(initiative_id)
         document_to_waive = self.repo.get_submission_template(initiative, document_name)
+        if not document_to_waive:
+            raise NotFound(f"The document for this initiative {initiative_id}  was not found.")
+
         data_to_update = {
             'status': DocumentStatus.WAIVED,
             'waiver_reason': waiver_reason
