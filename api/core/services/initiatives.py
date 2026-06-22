@@ -1,11 +1,9 @@
-from django.db.models import QuerySet
 from django.utils import timezone
-from api.auth.models import User
-from api.core.models import InitiativeDocument, InitiativeType, StageRequirementTemplate, Initiative
+from api.core.models import Initiative
 from api.core.repositories.initiative import InitiativeTypeRepository, StageRequirementTemplateRepository, \
     InitiativeDocumentRepository, InitiativeRepository, CategoryRepository
 from api.core.services.governance import AuditLogService, ApprovalService
-from utils.constants import DocumentStatus, Actions
+from utils.constants import DocumentStatus, Actions, STAGES, STATUS
 from rest_framework.exceptions import NotFound
 from utils.exceptions import InvalidStateTransitionException
 
@@ -68,23 +66,46 @@ class InitiativeService:
     def __init__(self):
         self.repo = InitiativeRepository()
 
+    def create(self, title, description, category_id, initiative_type_id, user):
+        initiative_type = InitiativeTypeService().get_by_id(initiative_type_id)
+        category = CategoryService().get_by_id(category_id)
+
+        if not user:
+            user = None
+        data = {
+            'title': title,
+            'description': description,
+            'category': category,
+            'initiative_type': initiative_type,
+            'current_stage': STAGES.INITIATION,
+            'status': STATUS.ACTIVE,
+            'owner': user,
+        }
+        return self.repo.create(**data)
+
     def get_by_id(self, initiative_id):
         initiative = self.repo.get_by_id(id=initiative_id)
         if not initiative:
             raise NotFound(f"Initiative with ID {initiative_id} was not found.")
         return initiative
 
+    def get_all(self):
+        return self.repo.get_all()
+
+    def update(self, initiative_id, **data_update):
+        initiative = InitiativeService().get_by_id(initiative_id)
+        InitiativeTypeService().get_by_id(data_update.get('initiative_type_id'))
+        CategoryService().get_by_id(data_update.get('category_id'))
+        return self.repo.update(initiative, **data_update)
+
 
 class StageRequirementTemplateService:
     def __init__(self):
         self.repo = StageRequirementTemplateRepository()
 
-    def create_template(self, initiative_type_id, stage: str, document_name: str,
+    def create(self, initiative_type_id, stage: str, document_name: str,
                         is_required: bool = True):
-        initiative_type = InitiativeTypeService().get_type_by_id(initiative_type_id)
-        if not initiative_type:
-            raise NotFound(f"Initiative Type with ID: {initiative_type_id} was not found.")
-
+        initiative_type = InitiativeTypeService().get_by_id(initiative_type_id)
         template_data = {
             'initiative_type': initiative_type,
             'stage': stage,
@@ -93,24 +114,31 @@ class StageRequirementTemplateService:
         }
         return self.repo.create(**template_data)
 
-    def get_template(self, initiative_type_id = None, stage: str = None):
-        if initiative_type_id is None:
-            return self.repo.get_all()
+    def get_all(self):
+        return self.repo.get_all()
 
-        initiative_type = InitiativeTypeService().get_type_by_id(initiative_type_id)
-        if not initiative_type:
-            raise NotFound(f"Initiative Type with ID: {initiative_type_id} was not found.")
-
-        if initiative_type and stage:
-            return self.repo.get_by_initiative_type_and_stage(initiative_type=initiative_type, stage=stage)
-
-        if initiative_type:
-            return self.repo.get_by_initiative_type(initiative_type=initiative_type)
-
-    def update_template(self, template_id, data_update: dict):
+    def get_by_id(self, template_id):
         requirement_template = self.repo.get_by_id(id=template_id)
         if not requirement_template:
             raise NotFound(f"Stage Requirement Template with ID {template_id} was not found.")
+        return requirement_template
+
+    def get_by_initiative_type(self, initiative_type_id, stage: str = None):
+        initiative_type = InitiativeTypeService().get_by_id(initiative_type_id)
+
+        if stage:
+            return self.repo.get_by_initiative_type_and_stage(initiative_type=initiative_type, stage=stage)
+
+        return self.repo.get_by_initiative_type(initiative_type=initiative_type)
+
+    def update(self, template_id, **data_update):
+        requirement_template = self.repo.get_by_id(id=template_id)
+        if not requirement_template:
+            raise NotFound(f"Stage Requirement Template with ID {template_id} was not found.")
+
+        initiative_type_id = data_update.pop('initiative_type_id', None)
+        if initiative_type_id:
+            data_update['initiative_type'] = InitiativeTypeService().get_by_id(initiative_type_id)
 
         return self.repo.update(requirement_template, **data_update)
 
@@ -127,7 +155,7 @@ class InitiativeDocumentService:
         self.repo = InitiativeDocumentRepository()
 
     def generate_checklist_for_initiative(self, initiative_id):
-        initiative: Initiative = InitiativeService().get_by_initiative_id(initiative_id)
+        initiative: Initiative = InitiativeService().get_by_id(initiative_id)
         existing_documents = self.repo.get_by_initiative(initiative)
 
         if existing_documents.exists():
@@ -136,7 +164,7 @@ class InitiativeDocumentService:
         return self.repo.generate_checklist(initiative)
 
     def submit_document(self, initiative_id, document_name, user):
-        initiative: Initiative = InitiativeService().get_by_initiative_id(initiative_id)
+        initiative: Initiative = InitiativeService().get_by_id(initiative_id)
         document_to_submit = self.repo.get_submission_template(initiative, document_name)
         if not document_to_submit:
             raise NotFound(f"The document for this initiative {initiative_id}  was not found.")
@@ -155,7 +183,7 @@ class InitiativeDocumentService:
         return submission
 
     def waive_document(self, initiative_id, document_id, waiver_reason, user):
-        initiative: Initiative = InitiativeService().get_by_initiative_id(initiative_id)
+        initiative: Initiative = InitiativeService().get_by_id(initiative_id)
         waiver = ApprovalService().waive_document(document_id, user, waiver_reason)
         AuditLogService().log(initiative, Actions.WAIVED, user, waiver)
         return waiver
@@ -164,9 +192,9 @@ class InitiativeDocumentService:
         return self.repo.get_all()
 
     def get_documents_for_initiative(self, initiative_id):
-        initiative: Initiative = InitiativeService().get_by_initiative_id(initiative_id)
+        initiative: Initiative = InitiativeService().get_by_id(initiative_id)
         return self.repo.get_by_initiative(initiative)
 
     def get_pending_approvals_for_initiative(self, initiative_id):
-        initiative: Initiative = InitiativeService().get_by_initiative_id(initiative_id)
+        initiative: Initiative = InitiativeService().get_by_id(initiative_id)
         return self.repo.get_pending_approvals(initiative)

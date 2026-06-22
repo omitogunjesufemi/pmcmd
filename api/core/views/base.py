@@ -14,6 +14,8 @@ class BaseCRUDAPIView(APIView):
     permission_classes_by_method = {}
 
     def get_service(self):
+        if self.service_class is None:
+            raise NotImplementedError("service_class must be set.")
         return self.service_class()
 
     def get_serializer_class(self):
@@ -32,11 +34,14 @@ class BaseCRUDAPIView(APIView):
         )
         return [permission() for permission in permission_classes]
 
+    def get_service_context(self):
+        return {}
+
 
 class BaseListCreateAPIView(BaseCRUDAPIView):
     def get(self, request: Request):
         items = self.get_service().get_all()
-        data = self.get_serializer_class()(items, many=True).data
+        data = self.get_output_serializer_class()(items, many=True).data
         return Response(
             {
                 "success": True,
@@ -45,10 +50,11 @@ class BaseListCreateAPIView(BaseCRUDAPIView):
             })
 
     def post(self, request: Request):
-        serializer = self.get_serializer_class()(data=request.data)
+        serializer = self.get_input_serializer_class()(data=request.data)
         serializer.is_valid(raise_exception=True)
-        instance = self.get_service().create(**serializer.validated_data)
-        data = self.get_serializer_class()(instance).data
+        instance = self.get_service().create(**serializer.validated_data,
+                                             **self.get_service_context())
+        data = self.get_output_serializer_class()(instance).data
         return Response(
             {
                 "success": True,
@@ -67,7 +73,7 @@ class BaseRetrieveUpdateDeleteAPIView(BaseCRUDAPIView):
 
     def get(self, request: Request, **kwargs):
         instance = self.get_service().get_by_id(self.get_object_id())
-        data = self.get_serializer_class()(instance).data
+        data = self.get_output_serializer_class()(instance).data
         return Response(
             {
                 "success": True,
@@ -78,7 +84,7 @@ class BaseRetrieveUpdateDeleteAPIView(BaseCRUDAPIView):
         )
 
     def patch(self, request: Request, **kwargs):
-        serializer = self.get_input_serializer_class()(data=request.data)
+        serializer = self.get_input_serializer_class()(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         instance = self.get_service().update(self.get_object_id(), **serializer.validated_data)
         data = self.get_output_serializer_class()(instance).data
