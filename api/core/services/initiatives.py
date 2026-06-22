@@ -81,7 +81,9 @@ class InitiativeService:
             'status': STATUS.ACTIVE,
             'owner': user,
         }
-        return self.repo.create(**data)
+        initiative = self.repo.create(**data)
+        InitiativeDocumentService().generate_checklist_for_initiative(initiative.id)
+        return initiative
 
     def get_by_id(self, initiative_id):
         initiative = self.repo.get_by_id(id=initiative_id)

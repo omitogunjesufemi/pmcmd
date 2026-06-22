@@ -13,22 +13,6 @@ from api.core.serializers.initiatives import InitiativeDocumentOutputSerializer,
 from api.core.views.base import BaseListCreateAPIView, BaseRetrieveUpdateDeleteAPIView
 
 
-class GetAllInitiativeDocuments(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request):
-        documents = InitiativeDocumentService().get_documents()
-        data = InitiativeDocumentOutputSerializer(documents, many=True).data
-        return Response(
-            {
-                'success': True,
-                'message': 'Initiative Document retrieved successfully',
-                'data': data,
-            },
-            status=status.HTTP_200_OK
-        )
-
-
 # -------------------------------------
 # Initiative CRUD Type View Actions   |
 # -------------------------------------
@@ -228,3 +212,8 @@ class InitiativeDetailUpdateView(BaseRetrieveUpdateDeleteAPIView):
         'GET': [AllowAny],
         'PATCH': [AllowAny]
     }
+
+
+# ------------------------------------
+# Initiative Document CRUD View Actions       |
+# ------------------------------------

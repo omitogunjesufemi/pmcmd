@@ -1,6 +1,6 @@
 from rest_framework.urls import path
 
-from api.core.views.initiatives import GetAllInitiativeDocuments, InitiativeTypeListCreateView, \
+from api.core.views.initiatives import InitiativeTypeListCreateView, \
     InitiativeTypeDetailView, CategoryListCreateView, CategoryDetailView, RequirementTemplateListCreateView, \
     RequirementTemplateDetailView, InitiativeListCreateView, InitiativeDetailUpdateView
 
