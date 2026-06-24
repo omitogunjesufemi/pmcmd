@@ -5,12 +5,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.core.serializers import CategorySerializer, StageRequirementTemplateInputSerializer, \
-    StageRequirementTemplateOutputSerializer, InitiativeInputSerializer
+    StageRequirementTemplateOutputSerializer, InitiativeInputSerializer, InitiativeDocumentInputSerializer
 from api.core.services.initiatives import InitiativeDocumentService, InitiativeTypeService, CategoryService, \
     StageRequirementTemplateService, InitiativeService
 from api.core.serializers.initiatives import InitiativeDocumentOutputSerializer, InitiativeTypeSerializer, \
     InitiativeOutputSerializer
-from api.core.views.base import BaseListCreateAPIView, BaseRetrieveUpdateDeleteAPIView
+from api.core.views.base import BaseListCreateAPIView, BaseRetrieveUpdateAPIView, BaseListAPIView, \
+    BaseRetrieveAPIView
 
 
 # -------------------------------------
@@ -50,7 +51,7 @@ class InitiativeTypeListCreateView(BaseListCreateAPIView):
         responses=InitiativeTypeSerializer,
     ),
 )
-class InitiativeTypeDetailView(BaseRetrieveUpdateDeleteAPIView):
+class InitiativeTypeDetailView(BaseRetrieveUpdateAPIView):
     service_class = InitiativeTypeService
     serializer_class = InitiativeTypeSerializer
     resource_name = "Initiative Type"
@@ -99,7 +100,7 @@ class CategoryListCreateView(BaseListCreateAPIView):
         responses=CategorySerializer,
     ),
 )
-class CategoryDetailView(BaseRetrieveUpdateDeleteAPIView):
+class CategoryDetailView(BaseRetrieveUpdateAPIView):
     service_class = CategoryService
     serializer_class = CategorySerializer
     resource_name = "Category"
@@ -149,7 +150,7 @@ class RequirementTemplateListCreateView(BaseListCreateAPIView):
         responses=StageRequirementTemplateOutputSerializer,
     ),
 )
-class RequirementTemplateDetailView(BaseRetrieveUpdateDeleteAPIView):
+class RequirementTemplateDetailView(BaseRetrieveUpdateAPIView):
     service_class = StageRequirementTemplateService
     input_serializer_class = StageRequirementTemplateInputSerializer
     output_serializer_class = StageRequirementTemplateOutputSerializer
@@ -169,7 +170,7 @@ class RequirementTemplateDetailView(BaseRetrieveUpdateDeleteAPIView):
 )
 @extend_schema_view(
     get=extend_schema(
-        responses=InitiativeOutputSerializer
+        responses=InitiativeOutputSerializer(many=True)
     ),
     post=extend_schema(
         request=InitiativeInputSerializer,
@@ -186,8 +187,11 @@ class InitiativeListCreateView(BaseListCreateAPIView):
         'POST': [AllowAny]
     }
 
-    def get_service_context(self):
-        return {'user': self.request.user}
+    def get_create_service_kwargs(self, serializer):
+        return {
+            **serializer.validated_data,
+            'user': self.request.user if self.request.user.is_authenticated else None
+        }
 
 
 @extend_schema(
@@ -202,7 +206,7 @@ class InitiativeListCreateView(BaseListCreateAPIView):
         responses=InitiativeOutputSerializer
     )
 )
-class InitiativeDetailUpdateView(BaseRetrieveUpdateDeleteAPIView):
+class InitiativeDetailUpdateView(BaseRetrieveUpdateAPIView):
     service_class = InitiativeService
     input_serializer_class = InitiativeInputSerializer
     output_serializer_class = InitiativeOutputSerializer
@@ -215,5 +219,36 @@ class InitiativeDetailUpdateView(BaseRetrieveUpdateDeleteAPIView):
 
 
 # ------------------------------------
-# Initiative Document CRUD View Actions       |
+# Initiative View Actions
+# ------------------------------------
+@extend_schema(
+    tags=["Initiative Documents"],
+    responses=InitiativeDocumentOutputSerializer
+)
+class InitiativeDocumentListView(BaseListAPIView):
+    service_class = InitiativeDocumentService
+    input_serializer_class = InitiativeDocumentInputSerializer
+    output_serializer_class = InitiativeDocumentOutputSerializer
+    resource_name = "Initiative Document"
+    permission_classes_by_method = {
+        'GET': [AllowAny],
+    }
+
+
+@extend_schema(
+    tags=["Initiative Documents"],
+    responses=InitiativeDocumentOutputSerializer
+)
+class InitiativeDocumentDetailView(BaseRetrieveAPIView):
+    service_class = InitiativeDocumentService
+    input_serializer_class = InitiativeDocumentInputSerializer
+    output_serializer_class = InitiativeDocumentOutputSerializer
+    resource_name = "Initiative Document"
+    lookup_url_kwarg = "document_id"
+    permission_classes_by_method = {
+        'GET': [AllowAny],
+    }
+
+# ------------------------------------
+# Initiative Document CRUD View Actions
 # ------------------------------------

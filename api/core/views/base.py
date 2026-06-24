@@ -6,6 +6,11 @@ from rest_framework.views import APIView
 
 class BaseCRUDAPIView(APIView):
     service_class = None
+    list_service_method = "get_all"
+    retrieve_service_method = "get_by_id"
+    create_service_method = "create"
+    update_service_method = "update"
+
     serializer_class = None
     input_serializer_class = None
     output_serializer_class = None
@@ -13,18 +18,60 @@ class BaseCRUDAPIView(APIView):
     permission_classes = []
     permission_classes_by_method = {}
 
+    lookup_url_kwarg = 'id'
+
+    def get_object_id(self):
+        return self.kwargs[self.lookup_url_kwarg]
+
     def get_service(self):
         if self.service_class is None:
             raise NotImplementedError("service_class must be set.")
         return self.service_class()
 
+    def call_service_method(self, method_name, *args, **kwargs):
+        service = self.get_service()
+        method = getattr(service, method_name, None)
+        if not callable(method):
+            raise NotImplementedError("service does not have this method.")
+        return method(*args, **kwargs)
+
+    def get_list_service_args(self):
+        return []
+
+    def get_list_service_kwargs(self):
+        return {}
+
+    def get_retrieve_service_args(self):
+        return [self.get_object_id()]
+
+    def get_retrieve_service_kwargs(self):
+        return {}
+
+    def get_create_service_args(self, serializer):
+        return []
+
+    def get_create_service_kwargs(self, serializer):
+        return serializer.validated_data
+
+    def get_update_service_args(self, serializer):
+        return [self.get_object_id()]
+
+    def get_update_service_kwargs(self, serializer):
+        return serializer.validated_data
+
     def get_serializer_class(self):
         return self.serializer_class
 
     def get_input_serializer_class(self):
+        serializer_c = self.input_serializer_class or self.serializer_class
+        if serializer_c is None:
+            raise NotImplementedError("The input serializer was not implemented.")
         return self.input_serializer_class or self.serializer_class
 
     def get_output_serializer_class(self):
+        serializer_c = self.output_serializer_class or self.serializer_class
+        if serializer_c is None:
+            raise NotImplementedError("The output serializer was not implemented.")
         return self.output_serializer_class or self.serializer_class
 
     def get_permissions(self):
@@ -34,13 +81,12 @@ class BaseCRUDAPIView(APIView):
         )
         return [permission() for permission in permission_classes]
 
-    def get_service_context(self):
-        return {}
 
-
-class BaseListCreateAPIView(BaseCRUDAPIView):
+class BaseListAPIView(BaseCRUDAPIView):
     def get(self, request: Request):
-        items = self.get_service().get_all()
+        items = self.call_service_method(self.list_service_method,
+                                         *self.get_list_service_args(),
+                                         **self.get_list_service_kwargs())
         data = self.get_output_serializer_class()(items, many=True).data
         return Response(
             {
@@ -49,11 +95,14 @@ class BaseListCreateAPIView(BaseCRUDAPIView):
                 "data": data,
             })
 
+
+class BaseCreateAPIView(BaseCRUDAPIView):
     def post(self, request: Request):
         serializer = self.get_input_serializer_class()(data=request.data)
         serializer.is_valid(raise_exception=True)
-        instance = self.get_service().create(**serializer.validated_data,
-                                             **self.get_service_context())
+        instance = self.call_service_method(self.create_service_method,
+                                            *self.get_create_service_args(serializer),
+                                            **self.get_create_service_kwargs(serializer))
         data = self.get_output_serializer_class()(instance).data
         return Response(
             {
@@ -65,14 +114,15 @@ class BaseListCreateAPIView(BaseCRUDAPIView):
         )
 
 
-class BaseRetrieveUpdateDeleteAPIView(BaseCRUDAPIView):
-    lookup_url_kwarg = 'id'
+class BaseListCreateAPIView(BaseListAPIView, BaseCreateAPIView):
+    pass
 
-    def get_object_id(self):
-        return self.kwargs[self.lookup_url_kwarg]
 
+class BaseRetrieveAPIView(BaseCRUDAPIView):
     def get(self, request: Request, **kwargs):
-        instance = self.get_service().get_by_id(self.get_object_id())
+        instance = self.call_service_method(self.retrieve_service_method,
+                                            *self.get_retrieve_service_args(),
+                                            **self.get_retrieve_service_kwargs())
         data = self.get_output_serializer_class()(instance).data
         return Response(
             {
@@ -83,10 +133,14 @@ class BaseRetrieveUpdateDeleteAPIView(BaseCRUDAPIView):
             status=status.HTTP_200_OK
         )
 
+
+class BaseUpdateAPIView(BaseCRUDAPIView):
     def patch(self, request: Request, **kwargs):
         serializer = self.get_input_serializer_class()(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        instance = self.get_service().update(self.get_object_id(), **serializer.validated_data)
+        instance = self.call_service_method(self.update_service_method,
+                                            *self.get_update_service_args(serializer),
+                                            **self.get_update_service_kwargs(serializer))
         data = self.get_output_serializer_class()(instance).data
         return Response(
             {
@@ -96,3 +150,7 @@ class BaseRetrieveUpdateDeleteAPIView(BaseCRUDAPIView):
             },
             status=status.HTTP_200_OK
         )
+
+
+class BaseRetrieveUpdateAPIView(BaseRetrieveAPIView, BaseUpdateAPIView):
+    pass

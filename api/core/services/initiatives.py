@@ -96,8 +96,12 @@ class InitiativeService:
 
     def update(self, initiative_id, **data_update):
         initiative = InitiativeService().get_by_id(initiative_id)
-        InitiativeTypeService().get_by_id(data_update.get('initiative_type_id'))
-        CategoryService().get_by_id(data_update.get('category_id'))
+
+        if 'initiative_type_id' in data_update:
+            InitiativeTypeService().get_by_id(data_update.get('initiative_type_id'))
+
+        if 'category_id' in data_update:
+            CategoryService().get_by_id(data_update.get('category_id'))
         return self.repo.update(initiative, **data_update)
 
 
@@ -190,12 +194,18 @@ class InitiativeDocumentService:
         AuditLogService().log(initiative, Actions.WAIVED, user, waiver)
         return waiver
 
-    def get_documents(self):
+    def get_all(self):
         return self.repo.get_all()
 
     def get_documents_for_initiative(self, initiative_id):
         initiative: Initiative = InitiativeService().get_by_id(initiative_id)
         return self.repo.get_by_initiative(initiative)
+
+    def get_by_id(self, document_id):
+        document = self.repo.get_by_id(document_id)
+        if not document:
+            raise NotFound(f"The document with {document_id} was not found.")
+        return document
 
     def get_pending_approvals_for_initiative(self, initiative_id):
         initiative: Initiative = InitiativeService().get_by_id(initiative_id)
