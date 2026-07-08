@@ -1,10 +1,11 @@
 from django.utils import timezone
+from api.auth.models import User
 from api.core.models import Initiative
 from api.core.repositories.initiative import InitiativeTypeRepository, StageRequirementTemplateRepository, \
     InitiativeDocumentRepository, InitiativeRepository, CategoryRepository
 from api.core.services.governance import AuditLogService, ApprovalService
 from utils.constants import DocumentStatus, Actions, STAGES, STATUS
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, NotAuthenticated
 from utils.exceptions import InvalidStateTransitionException
 
 
@@ -94,6 +95,12 @@ class InitiativeService:
     def get_all(self):
         return self.repo.get_all()
 
+    def get_by_owner(self, owner:User):
+        if not owner:
+            raise NotFound("Owner not found.")
+        initiatives = self.repo.get_all_with_filters(owner=owner)
+        return initiatives
+
     def update(self, initiative_id, **data_update):
         initiative = InitiativeService().get_by_id(initiative_id)
 
@@ -173,7 +180,7 @@ class InitiativeDocumentService:
         initiative: Initiative = InitiativeService().get_by_id(initiative_id)
         document_to_submit = self.repo.get_submission_template(initiative, document_name)
         if not document_to_submit:
-            raise NotFound(f"The document for this initiative {initiative_id}  was not found.")
+            raise NotFound(f"The document ({document_name}) for this initiative {initiative_id}  was not found.")
 
         if document_to_submit.status in [DocumentStatus.SUBMITTED,
                                          DocumentStatus.WAIVED, DocumentStatus.APPROVED]:
@@ -199,13 +206,20 @@ class InitiativeDocumentService:
 
     def get_documents_for_initiative(self, initiative_id):
         initiative: Initiative = InitiativeService().get_by_id(initiative_id)
-        return self.repo.get_by_initiative(initiative)
+        return self.repo.get_by_filters(initiative)
+
+    def get_documents_for_owner(self, owner: User):
+        return self.repo.get_by_filters(submitted_by=owner)
 
     def get_by_id(self, document_id):
         document = self.repo.get_by_id(document_id)
         if not document:
             raise NotFound(f"The document with {document_id} was not found.")
         return document
+
+    def get_blocking_document_for_initiative(self, initiative_id, stage):
+        initiative: Initiative = InitiativeService().get_by_id(initiative_id)
+        return self.repo.get_blocking_documents(initiative, stage)
 
     def get_pending_approvals_for_initiative(self, initiative_id):
         initiative: Initiative = InitiativeService().get_by_id(initiative_id)

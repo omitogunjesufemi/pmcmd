@@ -1,3 +1,4 @@
+from sys import int_info
 from typing import List
 from django.db.models import QuerySet
 from api.auth.models import User
@@ -11,7 +12,7 @@ class InitiativeRepository(BaseRepository):
     model = Initiative
 
     def get_all_with_filters(self, stage=None, status=None,
-                             category=None, initiative_type=None, owner=None):
+                             category=None, initiative_type=None, owner=None) -> QuerySet[Initiative]:
         initiatives = (self.model.objects
                        .select_related('initiative_type', 'category', 'owner')
                        .all())
@@ -44,10 +45,15 @@ class InitiativeRepository(BaseRepository):
 class InitiativeDocumentRepository(BaseRepository):
     model = InitiativeDocument
 
-    def get_by_initiative(self, initiative) -> QuerySet[InitiativeDocument]:
+    def get_by_filters(self, initiative=None, submitted_by:User=None) -> QuerySet[InitiativeDocument]:
         documents = (self.model.objects
                      .select_related('initiative', 'submitted_by')
-                     .filter(initiative=initiative))
+                     .all())
+        if initiative:
+            documents = documents.filter(initiative=initiative)
+
+        if submitted_by:
+            documents = documents.filter(submitted_by=submitted_by)
         return documents
 
     def get_submission_template(self, initiative, document_name) -> InitiativeDocument:
@@ -67,10 +73,10 @@ class InitiativeDocumentRepository(BaseRepository):
 
         return documents
 
-    def get_blocking_documents(self, initiative, stage) -> QuerySet[InitiativeDocument]:
+    def get_blocking_documents(self, initiative, stage:str) -> QuerySet[InitiativeDocument]:
         documents = (self.model.objects
                      .select_related('initiative', 'submitted_by')
-                     .filter(initiative=initiative, stage=stage, is_required=True)
+                     .filter(initiative=initiative, stage=stage.lower(), is_required=True)
                      .exclude(status__in=[DocumentStatus.WAIVED, DocumentStatus.APPROVED]))
         return documents
 

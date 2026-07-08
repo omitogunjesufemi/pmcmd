@@ -91,3 +91,7 @@ class InitiativeDocumentInputSerializer(serializers.Serializer):
         allow_null=True,
         required=False
     )
+
+
+class SubmitInitiativeDocumentSerializer(serializers.Serializer):
+    document_name = serializers.CharField(max_length=100)

@@ -1,17 +1,15 @@
 from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import status
 from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
-from rest_framework.views import APIView
-
+from rest_framework.permissions import AllowAny
 from api.core.serializers import CategorySerializer, StageRequirementTemplateInputSerializer, \
     StageRequirementTemplateOutputSerializer, InitiativeInputSerializer, InitiativeDocumentInputSerializer
 from api.core.services.initiatives import InitiativeDocumentService, InitiativeTypeService, CategoryService, \
     StageRequirementTemplateService, InitiativeService
 from api.core.serializers.initiatives import InitiativeDocumentOutputSerializer, InitiativeTypeSerializer, \
-    InitiativeOutputSerializer
+    InitiativeOutputSerializer, SubmitInitiativeDocumentSerializer
 from api.core.views.base import BaseListCreateAPIView, BaseRetrieveUpdateAPIView, BaseListAPIView, \
-    BaseRetrieveAPIView
+    BaseRetrieveAPIView, BaseUpdateAPIView
+from utils.constants import PENDING_DOC_PARAM, BLOCKING_DOC_PARAM, DOC_NAME_PARAM
 
 
 # -------------------------------------
@@ -218,12 +216,31 @@ class InitiativeDetailUpdateView(BaseRetrieveUpdateAPIView):
     }
 
 
+@extend_schema(
+    tags=["Initiatives"],
+    responses=InitiativeOutputSerializer(many=True)
+)
+class OwnerInitiativeListView(BaseListAPIView):
+    service_class = InitiativeService
+    list_service_method = "get_by_owner"
+    output_serializer_class = InitiativeOutputSerializer
+    resource_name = "Initiative"
+    permission_classes_by_method = {
+        'GET': [AllowAny]
+    }
+
+    def get_list_service_kwargs(self):
+        return {
+            'owner': self.request.user
+        }
+
+
 # ------------------------------------
-# Initiative View Actions
+# Initiative Document CRUD View Actions
 # ------------------------------------
 @extend_schema(
     tags=["Initiative Documents"],
-    responses=InitiativeDocumentOutputSerializer
+    responses=InitiativeDocumentOutputSerializer(many=True)
 )
 class InitiativeDocumentListView(BaseListAPIView):
     service_class = InitiativeDocumentService
@@ -234,6 +251,66 @@ class InitiativeDocumentListView(BaseListAPIView):
         'GET': [AllowAny],
     }
 
+
+@extend_schema(
+    tags=["Initiative Documents"],
+    responses=InitiativeDocumentOutputSerializer(many=True)
+)
+class DocumentsForAInitiativeListView(BaseListAPIView):
+    service_class = InitiativeDocumentService
+    list_service_method = "get_documents_for_initiative"
+    output_serializer_class = InitiativeDocumentOutputSerializer
+    resource_name = "Initiative Document"
+    permission_classes_by_method = {
+        'GET': [AllowAny],
+    }
+    lookup_url_kwarg = 'initiative_id'
+
+    def get_list_service_kwargs(self):
+        return {
+            'initiative_id': self.get_object_id()
+        }
+
+
+@extend_schema(
+    tags=["Initiative Documents"],
+    parameters=BLOCKING_DOC_PARAM,
+    responses=InitiativeDocumentOutputSerializer(many=True)
+)
+class BlockingDocumentsForInitiativeView(BaseListAPIView):
+    service_class = InitiativeDocumentService
+    list_service_method = "get_blocking_document_for_initiative"
+    output_serializer_class = InitiativeDocumentOutputSerializer
+    resource_name = "Initiative Document"
+    permission_classes_by_method = {
+        'GET': [AllowAny],
+    }
+
+    def get_list_service_kwargs(self):
+        return {
+            'initiative_id': self.request.query_params.get('initiative_id', None),
+            'stage': self.request.query_params.get('stage', None),
+        }
+
+
+@extend_schema(
+    tags=["Initiative Documents"],
+    request=SubmitInitiativeDocumentSerializer,
+    responses=InitiativeDocumentOutputSerializer
+)
+class SubmitDocumentForInitiativeView(BaseUpdateAPIView):
+    service_class = InitiativeDocumentService
+    update_service_method = "submit_document"
+    input_serializer_class = SubmitInitiativeDocumentSerializer
+    output_serializer_class = InitiativeDocumentOutputSerializer
+    resource_name = "Initiative Document"
+    lookup_url_kwarg = "initiative_id"
+
+    def get_update_service_kwargs(self, serializer):
+        return {
+            'document_name': self.request.data.get('document_name', None),
+            'user': self.request.user
+        }
 
 @extend_schema(
     tags=["Initiative Documents"],
@@ -249,6 +326,40 @@ class InitiativeDocumentDetailView(BaseRetrieveAPIView):
         'GET': [AllowAny],
     }
 
-# ------------------------------------
-# Initiative Document CRUD View Actions
-# ------------------------------------
+@extend_schema(
+    tags=["Initiative Documents"],
+    responses=InitiativeDocumentOutputSerializer(many=True)
+)
+class OwnerInitiativeDocumentListView(BaseListAPIView):
+    service_class = InitiativeDocumentService
+    list_service_method = "get_documents_for_owner"
+    output_serializer_class = InitiativeDocumentOutputSerializer
+    resource_name = "Initiative Document"
+    permission_classes_by_method = {
+        'GET': [AllowAny],
+    }
+
+    def get_list_service_kwargs(self):
+        return {
+            'owner': self.request.user
+        }
+
+
+@extend_schema(
+    tags=["Initiative Documents"],
+    parameters=PENDING_DOC_PARAM,
+    responses=InitiativeDocumentOutputSerializer(many=True)
+)
+class PendingApprovalsInitiativeDocumentListView(BaseListAPIView):
+    service_class = InitiativeDocumentService
+    list_service_method = "get_pending_approvals_for_initiative"
+    output_serializer_class = InitiativeDocumentOutputSerializer
+    resource_name = "Initiative Document"
+    permission_classes_by_method = {
+        'GET': [AllowAny],
+    }
+
+    def get_list_service_kwargs(self):
+        return {
+            'initiative_id': self.request.query_params.get('initiative_id', None)
+        }

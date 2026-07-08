@@ -31,7 +31,7 @@ class BaseCRUDAPIView(APIView):
     def call_service_method(self, method_name, *args, **kwargs):
         service = self.get_service()
         method = getattr(service, method_name, None)
-        if not callable(method):
+        if method is None:
             raise NotImplementedError("service does not have this method.")
         return method(*args, **kwargs)
 
@@ -93,6 +93,7 @@ class BaseListAPIView(BaseCRUDAPIView):
                 "success": True,
                 "message": f"{self.resource_name}s retrieved successfully",
                 "data": data,
+                "count": len(data)
             })
 
 

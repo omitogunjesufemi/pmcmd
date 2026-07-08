@@ -1,4 +1,6 @@
 from django.db import models
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter
 
 
 class STAGES(models.TextChoices):
@@ -39,3 +41,46 @@ class Actions(models.TextChoices):
     STAGEADVANCED = 'stage-advanced', 'Stage Advanced'
     REASSIGNED = 'reassigned', 'Reassigned'
     HANDOVER = 'handover', 'Handover'
+
+
+class Roles(models.TextChoices):
+    PM = "pm", "Project Manager"
+    PMO_HEAD = "pmo_head", "Head, Project Management"
+
+
+PENDING_DOC_PARAM = [
+    OpenApiParameter(
+        name="initiative_id",
+        type=OpenApiTypes.UUID,
+        location=OpenApiParameter.QUERY,
+        description="Initiative ID",
+        required=True,
+    ),
+]
+
+BLOCKING_DOC_PARAM = [
+    OpenApiParameter(
+        name="initiative_id",
+        type=OpenApiTypes.UUID,
+        location=OpenApiParameter.QUERY,
+        description="Initiative ID",
+        required=True,
+    ),
+    OpenApiParameter(
+        name="stage",
+        type=OpenApiTypes.STR,
+        location=OpenApiParameter.QUERY,
+        description="Initiative Stage",
+        required=True,
+    ),
+]
+
+DOC_NAME_PARAM = [
+    OpenApiParameter(
+        name="document_name",
+        type=OpenApiTypes.STR,
+        location=OpenApiParameter.QUERY,
+        description="Document Name",
+        required=True,
+    )
+]
