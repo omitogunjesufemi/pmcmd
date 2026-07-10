@@ -11,6 +11,7 @@ class STAGES(models.TextChoices):
     GOLIVE = 'golive', 'Go-Live'
     POSTGOLIVE = 'pgolive', 'Post Go-Live'
 
+stage_list = ['initiation', 'development', 'testing', 'deployment', 'golive', 'pgolive']
 
 class STATUS(models.TextChoices):
     ACTIVE = 'active', 'Active'
@@ -38,9 +39,10 @@ class Actions(models.TextChoices):
     APPROVED = 'approved', 'Approved'
     REJECTED = 'rejected', 'Rejected'
     WAIVED = 'waived', 'Waived'
-    STAGEADVANCED = 'stage-advanced', 'Stage Advanced'
+    STAGEADVANCED = 'stage_advanced', 'Stage Advanced'
     REASSIGNED = 'reassigned', 'Reassigned'
     HANDOVER = 'handover', 'Handover'
+    UPDATED = 'updated', 'Updated'
 
 
 class Roles(models.TextChoices):
@@ -48,6 +50,7 @@ class Roles(models.TextChoices):
     PMO_HEAD = "pmo_head", "Head, Project Management"
 
 
+# PARAMETERS
 PENDING_DOC_PARAM = [
     OpenApiParameter(
         name="initiative_id",
@@ -73,6 +76,44 @@ BLOCKING_DOC_PARAM = [
         description="Initiative Stage",
         required=True,
     ),
+]
+
+INITIATIVE_LIST_PARAMS = [
+    OpenApiParameter(
+        name="initiative_type_id",
+        type=OpenApiTypes.UUID,
+        location=OpenApiParameter.QUERY,
+        description="Initiative Type ID",
+        required=False,
+    ),
+    OpenApiParameter(
+        name="category_id",
+        type=OpenApiTypes.UUID,
+        location=OpenApiParameter.QUERY,
+        description="Category ID",
+        required=False,
+    ),
+    OpenApiParameter(
+        name="stage",
+        type=OpenApiTypes.STR,
+        location=OpenApiParameter.QUERY,
+        description="Initiative Stage",
+        required=False,
+    ),
+    OpenApiParameter(
+        name="status",
+        type=OpenApiTypes.STR,
+        location=OpenApiParameter.QUERY,
+        description="Initiative Status",
+        required=False,
+    ),
+    OpenApiParameter(
+        name="page",
+        type=OpenApiTypes.STR,
+        location=OpenApiParameter.QUERY,
+        description="Pagination",
+        required=False,
+    )
 ]
 
 DOC_NAME_PARAM = [

@@ -1,15 +1,21 @@
 from drf_spectacular.utils import extend_schema
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework import status
+from rest_framework.request import Request
+from rest_framework.response import Response
+from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenBlacklistSerializer, \
+    TokenRefreshSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenBlacklistView, TokenRefreshView
 
-from api.auth.serializers import RegisterUserSerializer, UserSerializer
+from api.auth.serializers import RegisterUserSerializer, UserSerializer, CustomTokenBlacklistSerializer
 from api.auth.services import UserService
 from api.core.views.base import BaseCreateAPIView
 
 
 @extend_schema(
-    request = RegisterUserSerializer,
-    responses = UserSerializer
+    tags=['Authentication'],
+    request=RegisterUserSerializer,
+    responses=UserSerializer
 )
 class RegisterUserView(BaseCreateAPIView):
     service_class = UserService
@@ -20,6 +26,7 @@ class RegisterUserView(BaseCreateAPIView):
 
 
 @extend_schema(
+    tags=['Authentication'],
     request=TokenObtainPairSerializer,
     responses=TokenObtainPairSerializer
 )
@@ -27,5 +34,16 @@ class LoginView(TokenObtainPairView):
     serializer_class = TokenObtainPairSerializer
 
 
-class LogOutView:
-    pass
+@extend_schema(
+    tags=['Authentication'],
+    request=TokenRefreshSerializer,
+    responses=TokenRefreshSerializer
+)
+
+@extend_schema(
+    tags=['Authentication'],
+    request=CustomTokenBlacklistSerializer,
+    responses=CustomTokenBlacklistSerializer
+)
+class LogOutView(TokenBlacklistView):
+    serializer_class = CustomTokenBlacklistSerializer

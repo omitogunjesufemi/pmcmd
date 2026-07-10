@@ -1,4 +1,3 @@
-from sys import int_info
 from typing import List
 from django.db.models import QuerySet
 from api.auth.models import User
@@ -12,7 +11,7 @@ class InitiativeRepository(BaseRepository):
     model = Initiative
 
     def get_all_with_filters(self, stage=None, status=None,
-                             category=None, initiative_type=None, owner=None) -> QuerySet[Initiative]:
+                             category=None, initiative_type=None, owner:User=None) -> QuerySet[Initiative]:
         initiatives = (self.model.objects
                        .select_related('initiative_type', 'category', 'owner')
                        .all())
@@ -40,6 +39,10 @@ class InitiativeRepository(BaseRepository):
                       .filter(id=id)
                       .first())
         return initiatives
+
+    def get_by_id_and_owner(self, id, owner):
+        initiative = self.model.objects.filter(id=id, owner=owner).first()
+        return initiative
 
 
 class InitiativeDocumentRepository(BaseRepository):

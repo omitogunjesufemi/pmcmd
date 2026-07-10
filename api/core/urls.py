@@ -3,14 +3,14 @@ from rest_framework.urls import path
 from api.core.views.initiatives import InitiativeTypeListCreateView, \
     InitiativeTypeDetailView, CategoryListCreateView, CategoryDetailView, RequirementTemplateListCreateView, \
     RequirementTemplateDetailView, InitiativeListCreateView, InitiativeDetailUpdateView, \
-    InitiativeDocumentListView, InitiativeDocumentDetailView, OwnerInitiativeListView, OwnerInitiativeDocumentListView, \
+    InitiativeDocumentListView, InitiativeDocumentDetailView, OwnerInitiativeDocumentListView, \
     PendingApprovalsInitiativeDocumentListView, DocumentsForAInitiativeListView, \
-    BlockingDocumentsForInitiativeView, SubmitDocumentForInitiativeView
+    BlockingDocumentsForInitiativeView, SubmitDocumentForInitiativeView, AdvanceInitiativeStageView
 
 urlpatterns = [
     path('initiatives', InitiativeListCreateView.as_view(), name='initiative_list_create_view'),
-    path('intiatives/owner', OwnerInitiativeListView.as_view(), name='owner_initiative_list'),
     path('initiatives/<uuid:initiative_id>', InitiativeDetailUpdateView.as_view(), name='initiative_detail_update'),
+    path('initiatives/<uuid:initiative_id>/advance-stage', AdvanceInitiativeStageView.as_view(), name='advance_initiative_stage'),
 
     path('initiative_types', InitiativeTypeListCreateView.as_view(), name='initiative_type_list_create'),
     path('initiativetypes/<uuid:type_id>', InitiativeTypeDetailView.as_view(), name='initiative_type_detail_view'),

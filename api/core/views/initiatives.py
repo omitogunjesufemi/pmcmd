@@ -1,15 +1,15 @@
 from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.permissions import AllowAny
 from api.core.serializers import CategorySerializer, StageRequirementTemplateInputSerializer, \
     StageRequirementTemplateOutputSerializer, InitiativeInputSerializer, InitiativeDocumentInputSerializer
 from api.core.services.initiatives import InitiativeDocumentService, InitiativeTypeService, CategoryService, \
     StageRequirementTemplateService, InitiativeService
 from api.core.serializers.initiatives import InitiativeDocumentOutputSerializer, InitiativeTypeSerializer, \
-    InitiativeOutputSerializer, SubmitInitiativeDocumentSerializer
+    InitiativeOutputSerializer, SubmitInitiativeDocumentSerializer, AdvanceInitiativeStageOutputSerializer
 from api.core.views.base import BaseListCreateAPIView, BaseRetrieveUpdateAPIView, BaseListAPIView, \
-    BaseRetrieveAPIView, BaseUpdateAPIView
-from utils.constants import PENDING_DOC_PARAM, BLOCKING_DOC_PARAM, DOC_NAME_PARAM
+    BaseRetrieveAPIView, BaseUpdateAPIView, BaseCreateAPIView, BaseCreateNoSerializerAPIView
+from utils.constants import PENDING_DOC_PARAM, BLOCKING_DOC_PARAM, DOC_NAME_PARAM, INITIATIVE_LIST_PARAMS
 
 
 # -------------------------------------
@@ -81,7 +81,7 @@ class CategoryListCreateView(BaseListCreateAPIView):
     serializer_class = CategorySerializer
     resource_name = "Category"
     permission_classes_by_method = {
-        'GET': [AllowAny],
+        'GET': [IsAuthenticated],
         'POST': [AllowAny]
     }
 
@@ -168,6 +168,7 @@ class RequirementTemplateDetailView(BaseRetrieveUpdateAPIView):
 )
 @extend_schema_view(
     get=extend_schema(
+        parameters=INITIATIVE_LIST_PARAMS,
         responses=InitiativeOutputSerializer(many=True)
     ),
     post=extend_schema(
@@ -191,6 +192,16 @@ class InitiativeListCreateView(BaseListCreateAPIView):
             'user': self.request.user if self.request.user.is_authenticated else None
         }
 
+    def get_list_service_kwargs(self):
+        return {
+            'category_id': self.request.query_params.get('category_id', None),
+            'initiative_type_id': self.request.query_params.get('initiative_type_id', None),
+            'stage': self.request.query_params.get('stage', None),
+            'status': self.request.query_params.get('status', None),
+            'page': self.request.query_params.get('page', None),
+            'owner': self.request.user if self.request.user.is_authenticated else None,
+        }
+
 
 @extend_schema(
     tags=["Initiatives"]
@@ -206,6 +217,7 @@ class InitiativeListCreateView(BaseListCreateAPIView):
 )
 class InitiativeDetailUpdateView(BaseRetrieveUpdateAPIView):
     service_class = InitiativeService
+    retrieve_service_method = "get_by_id_and_owner"
     input_serializer_class = InitiativeInputSerializer
     output_serializer_class = InitiativeOutputSerializer
     resource_name = "Initiative"
@@ -215,29 +227,38 @@ class InitiativeDetailUpdateView(BaseRetrieveUpdateAPIView):
         'PATCH': [AllowAny]
     }
 
-
-@extend_schema(
-    tags=["Initiatives"],
-    responses=InitiativeOutputSerializer(many=True)
-)
-class OwnerInitiativeListView(BaseListAPIView):
-    service_class = InitiativeService
-    list_service_method = "get_by_owner"
-    output_serializer_class = InitiativeOutputSerializer
-    resource_name = "Initiative"
-    permission_classes_by_method = {
-        'GET': [AllowAny]
-    }
-
-    def get_list_service_kwargs(self):
+    def get_retrieve_service_kwargs(self):
         return {
-            'owner': self.request.user
+            'owner': self.request.user if self.request.user.is_authenticated else None,
         }
 
+    def get_update_service_kwargs(self, serializer):
+        return {
+            **serializer.validated_data,
+            'owner': self.request.user if self.request.user.is_authenticated else None
+        }
 
-# ------------------------------------
-# Initiative Document CRUD View Actions
-# ------------------------------------
+@extend_schema(
+    tags=["Initiative"],
+    responses=AdvanceInitiativeStageOutputSerializer
+)
+class AdvanceInitiativeStageView(BaseCreateNoSerializerAPIView):
+    service_class = InitiativeService
+    create_service_method = "advance_stage"
+    output_serializer_class = AdvanceInitiativeStageOutputSerializer
+    resource_name = "Initiative"
+    lookup_url_kwarg = "initiative_id"
+    permission_classes = [AllowAny]
+    response_message = f"{resource_name} advance to the next stage successfully"
+
+
+class InitiativeHandoverView(BaseCreateAPIView):
+    pass
+
+
+# ---------------------------------------
+# Initiative Document CRUD View Actions |
+# ---------------------------------------
 @extend_schema(
     tags=["Initiative Documents"],
     responses=InitiativeDocumentOutputSerializer(many=True)
@@ -325,6 +346,7 @@ class InitiativeDocumentDetailView(BaseRetrieveAPIView):
     permission_classes_by_method = {
         'GET': [AllowAny],
     }
+
 
 @extend_schema(
     tags=["Initiative Documents"],

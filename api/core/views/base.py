@@ -1,7 +1,12 @@
+from idlelib.rpc import response_queue
+
 from rest_framework import status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from utils.pagination import PMCMDPagination
 
 
 class BaseCRUDAPIView(APIView):
@@ -82,11 +87,26 @@ class BaseCRUDAPIView(APIView):
         return [permission() for permission in permission_classes]
 
 
+
 class BaseListAPIView(BaseCRUDAPIView):
     def get(self, request: Request):
         items = self.call_service_method(self.list_service_method,
                                          *self.get_list_service_args(),
                                          **self.get_list_service_kwargs())
+        paginator: PMCMDPagination = PMCMDPagination()
+        page = paginator.paginate_queryset(queryset=items, request=request, view=self)
+
+        if page is not None:
+            data = self.get_output_serializer_class()(page, many=True).data
+            result = paginator.get_paginated_response(data)
+
+            result.data = {
+                "success": True,
+                "message": f"{self.resource_name}s retrieved successfully",
+                **result.data
+            }
+            return result
+
         data = self.get_output_serializer_class()(items, many=True).data
         return Response(
             {
@@ -94,11 +114,13 @@ class BaseListAPIView(BaseCRUDAPIView):
                 "message": f"{self.resource_name}s retrieved successfully",
                 "data": data,
                 "count": len(data)
-            })
+            },
+            status=status.HTTP_200_OK
+        )
 
 
 class BaseCreateAPIView(BaseCRUDAPIView):
-    def post(self, request: Request):
+    def post(self, request: Request, **kwargs):
         serializer = self.get_input_serializer_class()(data=request.data)
         serializer.is_valid(raise_exception=True)
         instance = self.call_service_method(self.create_service_method,
@@ -112,6 +134,22 @@ class BaseCreateAPIView(BaseCRUDAPIView):
                 "data": data,
             },
             status=status.HTTP_201_CREATED
+        )
+
+
+class BaseCreateNoSerializerAPIView(BaseCRUDAPIView):
+    response_message = "Updated successfully"
+    def post(self, request: Request, **kwargs):
+        instance = self.call_service_method(self.create_service_method,
+                                            self.get_object_id(),
+                                            self.request.user)
+        data = self.get_output_serializer_class()(instance).data
+        return Response(
+            {
+                "success": True,
+                "message": self.response_message,
+                "data": data,
+            }
         )
 
 

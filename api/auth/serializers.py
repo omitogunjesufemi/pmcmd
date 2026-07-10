@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenBlacklistSerializer
 from api.auth.models import User
 from utils.constants import Roles
 
@@ -29,3 +29,16 @@ class RegisterUserSerializer(serializers.Serializer):
     role = serializers.ChoiceField(choices=Roles.choices, required=True)
     department = serializers.CharField(max_length=40, required=True)
     password = serializers.CharField(required=True)
+
+
+class CustomTokenBlacklistSerializer(TokenBlacklistSerializer):
+    success = serializers.BooleanField(read_only=True)
+    message = serializers.CharField(read_only=True)
+    def validate(self, attrs):
+        data = super().validate(attrs)
+
+        data.update({
+            'success': True,
+            'message': 'You have successfully logged out.',
+        })
+        return data

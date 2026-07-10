@@ -1,8 +1,7 @@
 from rest_framework import serializers
 from api.auth.serializers import UserSerializer
-from api.core.models.initiatives import (InitiativeType, Category, InitiativeDocument,
-                                         Initiative, StageRequirementTemplate)
-from utils.constants import DocumentStatus, STAGES
+from api.core.models.initiatives import (InitiativeType, Category, InitiativeDocument, Initiative, StageRequirementTemplate)
+from utils.constants import DocumentStatus, STAGES, STATUS
 
 
 class InitiativeTypeSerializer(serializers.ModelSerializer):
@@ -28,23 +27,32 @@ class InitiativeInputSerializer(serializers.Serializer):
     description = serializers.CharField()
     category_id = serializers.UUIDField()
     initiative_type_id = serializers.UUIDField()
+    status = serializers.ChoiceField(STATUS.choices)
 
 
 class InitiativeOutputSerializer(serializers.ModelSerializer):
     category = CategorySerializer(read_only=True)
     initiative_type = InitiativeTypeSerializer(read_only=True)
     owner = UserSerializer(read_only=True)
+    blocking_documents_count = serializers.CharField(read_only=True)
 
     class Meta:
         model = Initiative
         fields = [
-            'id', 'title', 'description', 'current_stage', 'status', 'initiative_type',
+            'id', 'title', 'description', 'current_stage', 'status', 'blocking_documents_count', 'initiative_type',
             'category', 'owner', 'created_at', 'updated_at'
         ]
         read_only_fields = [
             'id', 'current_stage', 'status',
             'owner', 'created_at', 'updated_at'
         ]
+
+
+class AdvanceInitiativeStageOutputSerializer(serializers.Serializer):
+    id = serializers.UUIDField(read_only=True)
+    previous_stage = serializers.ChoiceField(STAGES.choices, read_only=True)
+    current_stage = serializers.ChoiceField(STAGES.choices, read_only=True)
+    message = serializers.CharField()
 
 
 class StageRequirementTemplateOutputSerializer(serializers.ModelSerializer):

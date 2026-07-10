@@ -1,12 +1,14 @@
+from django.db import transaction
 from django.utils import timezone
 from api.auth.models import User
 from api.core.models import Initiative
 from api.core.repositories.initiative import InitiativeTypeRepository, StageRequirementTemplateRepository, \
     InitiativeDocumentRepository, InitiativeRepository, CategoryRepository
+from api.core.serializers import InitiativeDocumentOutputSerializer
 from api.core.services.governance import AuditLogService, ApprovalService
-from utils.constants import DocumentStatus, Actions, STAGES, STATUS
-from rest_framework.exceptions import NotFound, NotAuthenticated
-from utils.exceptions import InvalidStateTransitionException
+from utils.constants import DocumentStatus, Actions, STAGES, STATUS, stage_list
+from rest_framework.exceptions import NotFound, NotAuthenticated, PermissionDenied
+from utils.exceptions import InvalidStateTransitionException, ServiceException
 
 
 class InitiativeTypeService:
@@ -20,7 +22,7 @@ class InitiativeTypeService:
         return self.repo.create(**data)
 
     def get_by_id(self, type_id):
-        initiative_type =  self.repo.get_by_id(id=type_id)
+        initiative_type = self.repo.get_by_id(id=type_id)
         if not initiative_type:
             raise NotFound(f"initiative Type with ID {type_id} was not found.")
         return initiative_type
@@ -68,23 +70,26 @@ class InitiativeService:
         self.repo = InitiativeRepository()
 
     def create(self, title, description, category_id, initiative_type_id, user):
-        initiative_type = InitiativeTypeService().get_by_id(initiative_type_id)
-        category = CategoryService().get_by_id(category_id)
+        with transaction.atomic():
+            initiative_type = InitiativeTypeService().get_by_id(initiative_type_id)
+            category = CategoryService().get_by_id(category_id)
 
-        if not user:
-            user = None
-        data = {
-            'title': title,
-            'description': description,
-            'category': category,
-            'initiative_type': initiative_type,
-            'current_stage': STAGES.INITIATION,
-            'status': STATUS.ACTIVE,
-            'owner': user,
-        }
-        initiative = self.repo.create(**data)
-        InitiativeDocumentService().generate_checklist_for_initiative(initiative.id)
-        return initiative
+            if not user:
+                raise InvalidStateTransitionException("This action requires a signed in user.")
+
+            data = {
+                'title': title,
+                'description': description,
+                'category': category,
+                'initiative_type': initiative_type,
+                'current_stage': STAGES.INITIATION,
+                'status': STATUS.ACTIVE,
+                'owner': user,
+            }
+            initiative = self.repo.create(**data)
+            InitiativeDocumentService().generate_checklist_for_initiative(initiative.id)
+            AuditLogService().log(initiative, Actions.CREATED, user)
+            return initiative
 
     def get_by_id(self, initiative_id):
         initiative = self.repo.get_by_id(id=initiative_id)
@@ -92,24 +97,100 @@ class InitiativeService:
             raise NotFound(f"Initiative with ID {initiative_id} was not found.")
         return initiative
 
-    def get_all(self):
-        return self.repo.get_all()
+    def get_by_id_and_owner(self, initiative_id, owner):
+        initiative:Initiative = self.repo.get_by_id(id=initiative_id)
+        if not initiative:
+            raise NotFound(f"Initiative with ID {initiative_id} was not found.")
 
-    def get_by_owner(self, owner:User):
+        if not owner:
+            raise PermissionDenied("This user does not own this initiative.")
+
+        if owner.id is not initiative.owner.id:
+            raise PermissionDenied("This user doesn't have permission to update this initiative.")
+
+        return initiative
+
+    def get_all(self, stage=None, status=None, category_id=None, initiative_type_id=None, page=None, owner=None):
+        category = None
+        initiative_type = None
+        if initiative_type_id:
+            initiative_type = InitiativeTypeService().get_by_id(initiative_type_id)
+        if category_id:
+            category = CategoryService().get_by_id(category_id)
+        initiatives = self.repo.get_all_with_filters(stage, status, category, initiative_type, owner)
+
+        for initiative in initiatives:
+            blocking_documents_count = len(InitiativeDocumentService().get_blocking_document_for_initiative(initiative.id, initiative.current_stage))
+            initiative.blocking_documents_count = blocking_documents_count
+        return initiatives
+
+    def get_by_owner(self, owner: User):
         if not owner:
             raise NotFound("Owner not found.")
         initiatives = self.repo.get_all_with_filters(owner=owner)
         return initiatives
 
     def update(self, initiative_id, **data_update):
-        initiative = InitiativeService().get_by_id(initiative_id)
+        with transaction.atomic():
+            initiative = InitiativeService().get_by_id(initiative_id)
+            owner = None
 
-        if 'initiative_type_id' in data_update:
-            InitiativeTypeService().get_by_id(data_update.get('initiative_type_id'))
+            if 'initiative_type_id' in data_update:
+                InitiativeTypeService().get_by_id(data_update.get('initiative_type_id'))
 
-        if 'category_id' in data_update:
-            CategoryService().get_by_id(data_update.get('category_id'))
-        return self.repo.update(initiative, **data_update)
+            if 'category_id' in data_update:
+                CategoryService().get_by_id(data_update.get('category_id'))
+
+            if 'current_stage' in data_update:
+                raise ServiceException("Cannot update 'current_stage' directly.")
+
+            if 'owner' in data_update:
+                owner = data_update.get('owner')
+                if not owner:
+                    raise PermissionDenied("This user doesn't have permission to update this initiative.")
+                initiative = InitiativeService().get_by_id_and_owner(initiative_id, owner)
+
+            updated_data = self.repo.update(initiative, **data_update)
+            AuditLogService().log(initiative, Actions.UPDATED, owner)
+            return updated_data
+
+    def advance_stage(self, initiative_id, owner):
+        initiative: Initiative = InitiativeService().get_by_id_and_owner(initiative_id, owner)
+        prev_stage = initiative.current_stage
+        blocking_documents = InitiativeDocumentService().get_blocking_document_for_initiative(initiative_id, prev_stage)
+        blocking_documents_counts = len(blocking_documents)
+        if blocking_documents_counts > 0:
+            error_context = {
+                'message': f"There are {blocking_documents_counts} required documents pending.",
+                'error_code': 'STAGE_ADVANCEMENT_BLOCKED',
+                'blocking_documents': InitiativeDocumentOutputSerializer(blocking_documents, many=True).data
+            }
+            raise ServiceException(error_context)
+
+        if initiative.current_stage is STAGES.POSTGOLIVE:
+            raise ServiceException("Initiative is already at final stage (PostGoLive)")
+
+        if initiative.status is STATUS.CLOSED or initiative.status is STATUS.ONHOLD:
+            raise ServiceException(f"Initiative Status is {initiative.status.capitalize()}")
+
+        stage_idx = stage_list.index(prev_stage)
+        if stage_idx >= len(stage_list) - 1:
+            raise ServiceException("Initiative is already at final stage (PostGoLive)")
+
+        new_stage = stage_list[stage_idx + 1]
+        data_update = {
+            'current_stage': new_stage
+        }
+        updated_initiative = self.repo.update(initiative, **data_update)
+
+        return_data = {
+            'id': updated_initiative.id,
+            'previous_stage': prev_stage,
+            'current_stage': updated_initiative.current_stage,
+            'message': f"Initiative advanced to {updated_initiative.current_stage.capitalize()} stage."
+        }
+        AuditLogService().log(initiative, Actions.STAGEADVANCED, owner)
+        return return_data
 
 
 class StageRequirementTemplateService:
@@ -117,7 +198,7 @@ class StageRequirementTemplateService:
         self.repo = StageRequirementTemplateRepository()
 
     def create(self, initiative_type_id, stage: str, document_name: str,
-                        is_required: bool = True):
+               is_required: bool = True):
         initiative_type = InitiativeTypeService().get_by_id(initiative_type_id)
         template_data = {
             'initiative_type': initiative_type,
@@ -169,7 +250,7 @@ class InitiativeDocumentService:
 
     def generate_checklist_for_initiative(self, initiative_id):
         initiative: Initiative = InitiativeService().get_by_id(initiative_id)
-        existing_documents = self.repo.get_by_initiative(initiative)
+        existing_documents = self.repo.get_by_filters(initiative)
 
         if existing_documents.exists():
             raise InvalidStateTransitionException("Checklist has already been generated for this initiative.")
@@ -196,10 +277,11 @@ class InitiativeDocumentService:
         return submission
 
     def waive_document(self, initiative_id, document_id, waiver_reason, user):
-        initiative: Initiative = InitiativeService().get_by_id(initiative_id)
-        waiver = ApprovalService().waive_document(document_id, user, waiver_reason)
-        AuditLogService().log(initiative, Actions.WAIVED, user, waiver)
-        return waiver
+        with transaction.atomic():
+            initiative: Initiative = InitiativeService().get_by_id(initiative_id)
+            waiver = ApprovalService().waive_document(document_id, user, waiver_reason)
+            AuditLogService().log(initiative, Actions.WAIVED, user, waiver)
+            return waiver
 
     def get_all(self):
         return self.repo.get_all()
