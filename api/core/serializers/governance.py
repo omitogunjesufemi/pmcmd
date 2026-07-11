@@ -61,7 +61,6 @@ class AuditLogOutputSerializer(serializers.ModelSerializer):
 
 
 class HandoverInputSerializer(serializers.Serializer):
-    initiative_id = serializers.UUIDField()
     to_user_id = serializers.UUIDField()
     what_was_done = serializers.CharField()
     what_needs_doing = serializers.CharField()

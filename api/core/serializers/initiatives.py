@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from api.auth.serializers import UserSerializer
+from api.core.models import Handover
 from api.core.models.initiatives import (InitiativeType, Category, InitiativeDocument, Initiative, StageRequirementTemplate)
 from utils.constants import DocumentStatus, STAGES, STATUS
 
@@ -90,7 +91,6 @@ class InitiativeDocumentOutputSerializer(serializers.ModelSerializer):
 
 
 class InitiativeDocumentInputSerializer(serializers.Serializer):
-    initiative_id = serializers.UUIDField()
     stage = serializers.ChoiceField(choices=STAGES.choices)
     document_name = serializers.CharField(max_length=100)
     is_required = serializers.BooleanField(default=True)

@@ -48,7 +48,7 @@ class InitiativeRepository(BaseRepository):
 class InitiativeDocumentRepository(BaseRepository):
     model = InitiativeDocument
 
-    def get_by_filters(self, initiative=None, submitted_by:User=None) -> QuerySet[InitiativeDocument]:
+    def get_by_filters(self, initiative=None, submitted_by:User=None, stage=None,  status=None) -> QuerySet[InitiativeDocument]:
         documents = (self.model.objects
                      .select_related('initiative', 'submitted_by')
                      .all())
@@ -57,6 +57,12 @@ class InitiativeDocumentRepository(BaseRepository):
 
         if submitted_by:
             documents = documents.filter(submitted_by=submitted_by)
+
+        if stage:
+            documents = documents.filter(stage=stage)
+
+        if status:
+            documents = documents.filter(status=status)
         return documents
 
     def get_submission_template(self, initiative, document_name) -> InitiativeDocument:

@@ -89,7 +89,7 @@ class BaseCRUDAPIView(APIView):
 
 
 class BaseListAPIView(BaseCRUDAPIView):
-    def get(self, request: Request):
+    def get(self, request: Request, **kwargs):
         items = self.call_service_method(self.list_service_method,
                                          *self.get_list_service_args(),
                                          **self.get_list_service_kwargs())

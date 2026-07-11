@@ -11,7 +11,9 @@ class STAGES(models.TextChoices):
     GOLIVE = 'golive', 'Go-Live'
     POSTGOLIVE = 'pgolive', 'Post Go-Live'
 
+
 stage_list = ['initiation', 'development', 'testing', 'deployment', 'golive', 'pgolive']
+
 
 class STATUS(models.TextChoices):
     ACTIVE = 'active', 'Active'
@@ -50,7 +52,9 @@ class Roles(models.TextChoices):
     PMO_HEAD = "pmo_head", "Head, Project Management"
 
 
+# ------------
 # PARAMETERS
+# ------------
 PENDING_DOC_PARAM = [
     OpenApiParameter(
         name="initiative_id",
@@ -78,6 +82,30 @@ BLOCKING_DOC_PARAM = [
     ),
 ]
 
+Stage_Param = OpenApiParameter(
+    name="stage",
+    type=OpenApiTypes.STR,
+    location=OpenApiParameter.QUERY,
+    description="Initiative Stage",
+    required=False,
+)
+
+Status_Param = OpenApiParameter(
+    name="status",
+    type=OpenApiTypes.STR,
+    location=OpenApiParameter.QUERY,
+    description="Initiative Status",
+    required=False,
+)
+
+Page_Param = OpenApiParameter(
+    name="page",
+    type=OpenApiTypes.STR,
+    location=OpenApiParameter.QUERY,
+    description="Pagination",
+    required=False,
+)
+
 INITIATIVE_LIST_PARAMS = [
     OpenApiParameter(
         name="initiative_type_id",
@@ -93,27 +121,9 @@ INITIATIVE_LIST_PARAMS = [
         description="Category ID",
         required=False,
     ),
-    OpenApiParameter(
-        name="stage",
-        type=OpenApiTypes.STR,
-        location=OpenApiParameter.QUERY,
-        description="Initiative Stage",
-        required=False,
-    ),
-    OpenApiParameter(
-        name="status",
-        type=OpenApiTypes.STR,
-        location=OpenApiParameter.QUERY,
-        description="Initiative Status",
-        required=False,
-    ),
-    OpenApiParameter(
-        name="page",
-        type=OpenApiTypes.STR,
-        location=OpenApiParameter.QUERY,
-        description="Pagination",
-        required=False,
-    )
+    Stage_Param,
+    Status_Param,
+    Page_Param
 ]
 
 DOC_NAME_PARAM = [

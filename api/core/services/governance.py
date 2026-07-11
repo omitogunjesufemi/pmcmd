@@ -1,10 +1,13 @@
+from django.db import transaction
 from rest_framework.exceptions import NotFound
 
-from api.core.repositories.governance import AuditLogRepository, ApprovalRepository
+from api.auth.services import UserService
+from api.core.repositories.governance import AuditLogRepository, ApprovalRepository, HandoverRepository
 from api.core.repositories.initiative import InitiativeDocumentRepository
 from api.core.models import Initiative, InitiativeDocument, Approval
 from api.auth.models import User
-from utils.constants import DocumentStatus, ApprovalDecision
+from utils.constants import DocumentStatus, ApprovalDecision, Actions, Roles
+from utils.exceptions import ServiceException
 
 
 class AuditLogService:
@@ -66,3 +69,35 @@ class ApprovalService:
         self.repo.create(document=document_to_waive, reviewed_by=user,
                          decision=ApprovalDecision.WAIVED, comment=comment)
         return waiver
+
+
+class HandoverService:
+    def __init__(self):
+        self.repo = HandoverRepository()
+
+    def create_handover(self, initiative_id, from_user, to_user_id, what_was_done, what_needs_doing):
+        with transaction.atomic():
+            from api.core.services.initiatives import InitiativeService
+            print(f"Owner - {from_user}")
+            initiative: Initiative = InitiativeService().get_by_id_and_owner(initiative_id, owner=from_user)
+            to_user: User = UserService().get_by_id(to_user_id)
+            if to_user.id == from_user.id:
+                raise ServiceException(f"You cannot handover to yourself.")
+
+            if to_user.role is not Roles.PM:
+                raise ServiceException(f"The user you want to handover to is not a PM.")
+            data = {
+                'initiative': initiative,
+                'from_user': from_user,
+                'to_user':to_user,
+                'what_was_done': what_was_done,
+                'what_needs_doing': what_needs_doing
+            }
+            handover = self.repo.create(**data)
+            h_stat = {
+                'is_handed_over': True,
+                'owner': from_user
+            }
+            InitiativeService().update(initiative_id, **h_stat)
+            AuditLogService().log(initiative=initiative, action=Actions.HANDOVER, performed_by=from_user)
+            return handover

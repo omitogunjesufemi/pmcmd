@@ -105,7 +105,7 @@ class InitiativeService:
         if not owner:
             raise PermissionDenied("This user does not own this initiative.")
 
-        if owner.id is not initiative.owner.id:
+        if not (owner.id == initiative.owner.id):
             raise PermissionDenied("This user doesn't have permission to update this initiative.")
 
         return initiative
@@ -248,6 +248,28 @@ class InitiativeDocumentService:
     def __init__(self):
         self.repo = InitiativeDocumentRepository()
 
+    def add_custom_document(self, initiative_id, stage, document_name, owner, is_required=True, waiver_reason=None):
+        with transaction.atomic():
+            initiative: Initiative = InitiativeService().get_by_id_and_owner(initiative_id, owner)
+            documents = InitiativeDocumentService().get_documents_for_initiative(initiative_id=initiative.id, owner=owner)
+            for document in documents:
+                if document.document_name is document_name and document.stage is stage:
+                    raise ServiceException("This document with same name already exists at this stage.")
+
+            if stage.lower() not in stage_list:
+                raise ServiceException("This is an invalid stage value.")
+
+            data = {
+                'initiative': initiative,
+                'stage': stage,
+                'document_name': document_name,
+                'is_required': is_required,
+                'waiver_reason': waiver_reason
+            }
+            custom_document = self.repo.create(**data)
+            AuditLogService().log(initiative=initiative, action=Actions.CREATED, performed_by=owner, document=custom_document)
+            return custom_document
+
     def generate_checklist_for_initiative(self, initiative_id):
         initiative: Initiative = InitiativeService().get_by_id(initiative_id)
         existing_documents = self.repo.get_by_filters(initiative)
@@ -286,9 +308,9 @@ class InitiativeDocumentService:
     def get_all(self):
         return self.repo.get_all()
 
-    def get_documents_for_initiative(self, initiative_id):
-        initiative: Initiative = InitiativeService().get_by_id(initiative_id)
-        return self.repo.get_by_filters(initiative)
+    def get_documents_for_initiative(self, initiative_id, owner, stage=None,  status=None):
+        initiative: Initiative = InitiativeService().get_by_id_and_owner(initiative_id, owner)
+        return self.repo.get_by_filters(initiative=initiative, stage=stage, status=status)
 
     def get_documents_for_owner(self, owner: User):
         return self.repo.get_by_filters(submitted_by=owner)

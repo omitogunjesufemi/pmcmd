@@ -1,10 +1,28 @@
-from django.contrib.auth.models import AbstractUser
+import uuid
+
+from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models
 from api.core.repositories.base import BaseRepository
 from utils.constants import Roles
 
 
+class CustomUserManager(UserManager):
+    def create_superuser(
+        self, username=None, email=None, password=None, **extra_fields
+    ):
+        if email is None:
+            email = username
+
+        username = email.split('@')[0] if email else 'admin'
+        return super().create_superuser(username, email, password, **extra_fields)
+
+
 class User(AbstractUser):
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False
+    )
     role = models.CharField(
         choices=Roles.choices,
         default=Roles.PM,
@@ -19,6 +37,8 @@ class User(AbstractUser):
     USERNAME_FIELD = "email"
 
     REQUIRED_FIELDS = []
+
+    objects = CustomUserManager()
 
     def save(self, *args, **kwargs):
         if self.email:
