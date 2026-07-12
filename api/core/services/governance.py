@@ -6,6 +6,7 @@ from api.core.repositories.governance import AuditLogRepository, ApprovalReposit
 from api.core.repositories.initiative import InitiativeDocumentRepository
 from api.core.models import Initiative, InitiativeDocument, Approval
 from api.auth.models import User
+from api.core.services.initiatives import InitiativeService
 from utils.constants import DocumentStatus, ApprovalDecision, Actions, Roles
 from utils.exceptions import ServiceException
 
@@ -24,6 +25,10 @@ class AuditLogService:
         }
         audit_log = self.repo.create(audit_action=audit_data)
         return audit_log
+
+    def get_by_initiative(self, initiative_id):
+        initiative = InitiativeService().get_by_id(initiative_id=initiative_id)
+        return self.repo.get_by_initiative(initiative)
 
 
 class ApprovalService:

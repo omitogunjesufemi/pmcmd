@@ -39,6 +39,8 @@ class LoginView(TokenObtainPairView):
     request=TokenRefreshSerializer,
     responses=TokenRefreshSerializer
 )
+class PMTokenRefreshView(TokenRefreshView):
+    serializer_class = TokenRefreshSerializer
 
 @extend_schema(
     tags=['Authentication'],

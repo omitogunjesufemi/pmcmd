@@ -1,11 +1,10 @@
 from django.db import transaction
 from django.utils import timezone
 from api.auth.models import User
-from api.core.models import Initiative
+from api.core.models import Initiative, InitiativeDocument
 from api.core.repositories.initiative import InitiativeTypeRepository, StageRequirementTemplateRepository, \
     InitiativeDocumentRepository, InitiativeRepository, CategoryRepository
 from api.core.serializers import InitiativeDocumentOutputSerializer
-from api.core.services.governance import AuditLogService, ApprovalService
 from utils.constants import DocumentStatus, Actions, STAGES, STATUS, stage_list
 from rest_framework.exceptions import NotFound, NotAuthenticated, PermissionDenied
 from utils.exceptions import InvalidStateTransitionException, ServiceException
@@ -88,6 +87,7 @@ class InitiativeService:
             }
             initiative = self.repo.create(**data)
             InitiativeDocumentService().generate_checklist_for_initiative(initiative.id)
+            from api.core.services.governance import AuditLogService
             AuditLogService().log(initiative, Actions.CREATED, user)
             return initiative
 
@@ -151,6 +151,7 @@ class InitiativeService:
                 initiative = InitiativeService().get_by_id_and_owner(initiative_id, owner)
 
             updated_data = self.repo.update(initiative, **data_update)
+            from api.core.services.governance import AuditLogService
             AuditLogService().log(initiative, Actions.UPDATED, owner)
             return updated_data
 
@@ -189,6 +190,7 @@ class InitiativeService:
             'current_stage': updated_initiative.current_stage,
             'message': f"Initiative advanced to {updated_initiative.current_stage.capitalize()} stage."
         }
+        from api.core.services.governance import AuditLogService
         AuditLogService().log(initiative, Actions.STAGEADVANCED, owner)
         return return_data
 
@@ -267,6 +269,7 @@ class InitiativeDocumentService:
                 'waiver_reason': waiver_reason
             }
             custom_document = self.repo.create(**data)
+            from api.core.services.governance import AuditLogService
             AuditLogService().log(initiative=initiative, action=Actions.CREATED, performed_by=owner, document=custom_document)
             return custom_document
 
@@ -279,11 +282,12 @@ class InitiativeDocumentService:
 
         return self.repo.generate_checklist(initiative)
 
-    def submit_document(self, initiative_id, document_name, user):
+    def submit_document(self, initiative_id, document_id, user):
         initiative: Initiative = InitiativeService().get_by_id(initiative_id)
-        document_to_submit = self.repo.get_submission_template(initiative, document_name)
+        document: InitiativeDocument = self.get_by_id(document_id)
+        document_to_submit = self.repo.get_submission_template(initiative, document.document_name)
         if not document_to_submit:
-            raise NotFound(f"The document ({document_name}) for this initiative {initiative_id}  was not found.")
+            raise NotFound(f"The document ({document_id}) for this initiative {initiative_id}  was not found.")
 
         if document_to_submit.status in [DocumentStatus.SUBMITTED,
                                          DocumentStatus.WAIVED, DocumentStatus.APPROVED]:
@@ -295,11 +299,13 @@ class InitiativeDocumentService:
             'status': DocumentStatus.SUBMITTED
         }
         submission = self.repo.update(document_to_submit, **data_to_update)
+        from api.core.services.governance import AuditLogService
         AuditLogService().log(initiative, Actions.SUBMITTED, user, submission)
         return submission
 
     def waive_document(self, initiative_id, document_id, waiver_reason, user):
         with transaction.atomic():
+            from api.core.services.governance import AuditLogService, ApprovalService
             initiative: Initiative = InitiativeService().get_by_id(initiative_id)
             waiver = ApprovalService().waive_document(document_id, user, waiver_reason)
             AuditLogService().log(initiative, Actions.WAIVED, user, waiver)
@@ -321,8 +327,12 @@ class InitiativeDocumentService:
             raise NotFound(f"The document with {document_id} was not found.")
         return document
 
-    def get_blocking_document_for_initiative(self, initiative_id, stage):
+    def get_blocking_document_for_initiative(self, initiative_id, stage=None, owner=None):
         initiative: Initiative = InitiativeService().get_by_id(initiative_id)
+        if owner:
+            initiative = InitiativeService().get_by_id_and_owner(initiative_id, owner)
+        if stage is None:
+            stage = initiative.current_stage
         return self.repo.get_blocking_documents(initiative, stage)
 
     def get_pending_approvals_for_initiative(self, initiative_id):

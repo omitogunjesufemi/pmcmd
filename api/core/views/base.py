@@ -25,8 +25,17 @@ class BaseCRUDAPIView(APIView):
 
     lookup_url_kwarg = 'id'
 
+    lookup_url_kwargs = ['id']
+
     def get_object_id(self):
         return self.kwargs[self.lookup_url_kwarg]
+
+    def get_object_ids(self):
+        f_kwargs = {}
+        for kwarg in self.lookup_url_kwargs:
+            if kwarg in self.kwargs:
+                f_kwargs[kwarg] = self.kwargs[kwarg]
+        return f_kwargs
 
     def get_service(self):
         if self.service_class is None:
@@ -138,7 +147,7 @@ class BaseCreateAPIView(BaseCRUDAPIView):
 
 
 class BaseCreateNoSerializerAPIView(BaseCRUDAPIView):
-    response_message = "Updated successfully"
+    response_message = "Created successfully"
     def post(self, request: Request, **kwargs):
         instance = self.call_service_method(self.create_service_method,
                                             self.get_object_id(),
@@ -177,9 +186,7 @@ class BaseUpdateAPIView(BaseCRUDAPIView):
     def patch(self, request: Request, **kwargs):
         serializer = self.get_input_serializer_class()(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        instance = self.call_service_method(self.update_service_method,
-                                            *self.get_update_service_args(serializer),
-                                            **self.get_update_service_kwargs(serializer))
+        instance = self.call_service_method(self.update_service_method,)
         data = self.get_output_serializer_class()(instance).data
         return Response(
             {
@@ -189,6 +196,25 @@ class BaseUpdateAPIView(BaseCRUDAPIView):
             },
             status=status.HTTP_200_OK
         )
+
+
+class BaseUpdateNoSerializerAPIView(BaseCRUDAPIView):
+    def patch(self, request: Request, **kwargs):
+        instance = self.call_service_method(self.update_service_method,
+                                            **self.get_object_ids(),
+                                            user=self.request.user)
+        data = self.get_output_serializer_class()(instance).data
+        return Response(
+            {
+                "success": True,
+                "message": f"{self.resource_name} updated successfully",
+                "data": data,
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+
 
 
 class BaseRetrieveUpdateAPIView(BaseRetrieveAPIView, BaseUpdateAPIView):
